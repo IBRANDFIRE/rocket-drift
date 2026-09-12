@@ -1,3 +1,4 @@
+
 name: Universal APK Builder
 
 on:
@@ -32,16 +33,18 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
-      - name: Force Generate Fully Valid Google Services JSON
+      - name: Setup Gradle 8.7
+        uses: gradle/actions/setup-gradle@v3
+        with:
+          gradle-version: '8.7'
+
+      - name: Force Generate Valid Configs
         run: |
-          # 1. Environment files
           touch .env.example .env local.properties
 
-          # 2. Extract dynamic package name
-          PKG_NAME=$(grep -oP 'package="\K[^"]+' app/src/main/AndroidManifest.xml 2>/dev/null || grep -oP 'namespace\s+["'\'']\K[^"'\'']+' app/build.gradle* 2>/dev/null || grep -oP 'applicationId\s+["'\'']\K[^"'\'']+' app/build.gradle* 2>/dev/null || echo "com.aistudio.pocketengine.krvyp")
+          PKG_NAME=$(grep -oP 'package="\K[^"]+' app/src/main/AndroidManifest.xml 2>/dev/null || grep -oP 'namespace\s+["'\'']\K[^"'\'']+' app/build.gradle* 2>/dev/null || grep -oP 'applicationId\s+["'\'']\K[^"'\'']+' app/build.gradle* 2>/dev/null || echo "com.example.app")
           echo "Building for package: $PKG_NAME"
 
-          # 3. Create fully structured dummy google-services.json
           mkdir -p app
           cat <<EOF > app/google-services.json
           {
@@ -81,24 +84,13 @@ jobs:
           }
           EOF
 
-          # 4. Debug keystore check
           if [ ! -f debug.keystore ] && [ ! -f app/debug.keystore ]; then
             keytool -genkey -v -keystore debug.keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
             cp debug.keystore app/debug.keystore 2>/dev/null || true
           fi
 
-      - name: Ensure Gradle Executable & Wrapper Exists
-        run: |
-          if [ ! -f gradlew ]; then
-            gradle wrapper
-          fi
-          chmod +x gradlew || true
-
-      - name: Setup Gradle Cache
-        uses: gradle/actions/setup-gradle@v3
-
       - name: Build Debug APK
-        run: ./gradlew assembleDebug --no-daemon || gradle assembleDebug --no-daemon
+        run: gradle assembleDebug --no-daemon
 
       - name: Upload Output APK
         uses: actions/upload-artifact@v4
